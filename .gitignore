@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+output/
+venv/
+data/sample_stereo_pairs/
+*.egg-info/
+dist/
+build/
+.DS_Store
