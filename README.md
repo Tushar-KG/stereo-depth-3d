@@ -305,4 +305,4 @@ disparity search.
 
 ---
 
-*Built for the Computer Vision course, SEM 6.  Classical CV only.*
+by Tushar Kant Gupta
