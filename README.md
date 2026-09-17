@@ -215,15 +215,13 @@ python src/main.py \
 pytest tests/ -v
 ```
 
-All 26 tests should pass.  Tests use `tmp_path` fixtures — no hardcoded paths,
-fully isolated.
-
-To run a specific class:
 ```bash
-pytest tests/test_pipeline.py::TestEndToEnd -v
+# if `pytest` isn't recognized, use:
+python -m pytest tests/ -v
 ```
 
----
+All 28 tests should pass. Tests use `tmp_path` fixtures — no hardcoded paths,
+fully isolated.
 
 ## Viewing the Point Cloud (`.ply`)
 
