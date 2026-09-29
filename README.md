@@ -5,6 +5,7 @@
 
 ![pipeline](https://img.shields.io/badge/pipeline-classical_CV-blue)
 ![deps](https://img.shields.io/badge/deps-opencv%20%7C%20numpy%20%7C%20pytest-green)
+![tests](https://img.shields.io/badge/tests-30%20passed-brightgreen)
 
 ---
 
@@ -14,24 +15,31 @@ This project implements the full **passive stereo depth estimation** pipeline fr
 using only classical computer vision techniques.  Given two photographs taken from cameras
 separated by a known horizontal distance (a *stereo pair*), it produces:
 
-| Output | File | Description |
-|--------|------|-------------|
-| Disparity map | `output/disparity_maps/disparity.png` | Grayscale; brighter = closer |
-| Depth colormap | `output/disparity_maps/depth_colormap.png` | JET; red = close, blue = far |
-| 3-D point cloud | `output/point_clouds/reconstruction.ply` | ASCII PLY; open in MeshLab/CloudCompare/Blender |
+| Output | Committed sample | Description |
+|--------|-----------------|-------------|
+| Disparity map | [`sample_output/disparity_maps/disparity.png`](sample_output/disparity_maps/disparity.png) | Grayscale; brighter = closer |
+| Depth colormap | [`sample_output/disparity_maps/depth_colormap.png`](sample_output/disparity_maps/depth_colormap.png) | JET; red = close, blue = far |
+| 3-D point cloud | [`sample_output/point_clouds/reconstruction.ply`](sample_output/point_clouds/reconstruction.ply) | ASCII PLY; 10 k sampled points |
+| Input pair | [`sample_output/stereo_pairs/`](sample_output/stereo_pairs/) | left.png, right.png, calib.json, stereo_calib.json |
+
+> **Pre-generated outputs are committed** in `sample_output/` so you can verify results
+> without running the pipeline.  See [`sample_output/README.md`](sample_output/README.md).
 
 ---
 
 ## Features
 
 - **Stereo Block Matching** — both `StereoBM` (fast) and `StereoSGBM` (denser, recommended)
-- **Epipolar rectification** — full `cv2.stereoRectify` / `cv2.remap` pipeline for real cameras
-- **Metric depth** — `Z = (f × B) / d` with median-blur cleaning and far-clip
-- **Pinhole back-projection** — `X = (u − cx)·Z/f`, `Y = (v − cy)·Z/f`
+- **Full epipolar rectification** — `cv2.stereoRectify` + `cv2.initUndistortRectifyMap` + `cv2.remap`
+  demonstrated end-to-end using the synthetic rig's exact K, D, R, T matrices
+- **Metric depth** — `Z = (f x B) / d` with median-blur cleaning and far-clip
+- **Pinhole back-projection** — `X = (u - cx)*Z/f`, `Y = (v - cy)*Z/f`
 - **Hand-written ASCII PLY** — no Open3D, no libpcl; pure Python + NumPy
-- **Built-in synthetic scene** — works out-of-the-box with `--generate-sample`, no camera needed
+- **Built-in synthetic scene** — works out-of-the-box with `--generate-sample`, no camera needed;
+  also writes `stereo_calib.json` (K, D, R, T) so the rectification stage runs fully
 - **Checkerboard calibration** — `calibrate_from_checkerboard()` for real hardware
-- **26 pytest tests** — covers every module and the full pipeline end-to-end
+- **30 pytest tests** — covers every module and the full pipeline end-to-end,
+  including the live `stereoRectify` code path
 
 ---
 
@@ -50,26 +58,33 @@ separated by a known horizontal distance (a *stereo pair*), it produces:
 ```
 stereo-depth-3d/
 ├── README.md
-├── statement.md                    ← Problem statement (course deliverable)
+├── statement.md                    <- Problem statement (course deliverable)
 ├── requirements.txt
 ├── .gitignore
 │
 ├── src/
-│   ├── main.py                     ← CLI entry point (argparse)
-│   ├── calibration.py              ← load_calibration_json, calibrate_from_checkerboard
-│   ├── rectification.py            ← rectify_pair (epipolar rectification)
-│   ├── disparity.py                ← compute_disparity (BM / SGBM)
-│   ├── depth_estimation.py         ← disparity_to_depth, clean_depth_map
-│   ├── reconstruction.py           ← depth_to_pointcloud, save_ply
-│   └── generate_sample.py          ← synthetic stereo scene generator
+│   ├── main.py                     <- CLI entry point (argparse)
+│   ├── calibration.py              <- load_calibration_json, calibrate_from_checkerboard
+│   ├── rectification.py            <- rectify_pair (full stereoRectify or no-op)
+│   ├── disparity.py                <- compute_disparity (BM / SGBM)
+│   ├── depth_estimation.py         <- disparity_to_depth, clean_depth_map
+│   ├── reconstruction.py           <- depth_to_pointcloud, save_ply
+│   └── generate_sample.py          <- synthetic stereo scene + stereo_calib.json
+│
+├── sample_output/                  <- COMMITTED pre-generated results
+│   ├── README.md
+│   ├── stereo_pairs/               <- left.png, right.png, calib.json, stereo_calib.json
+│   ├── disparity_maps/             <- disparity.png, depth_colormap.png
+│   └── point_clouds/               <- reconstruction.ply (10 k points)
 │
 ├── data/
-│   └── sample_stereo_pairs/        ← generated at runtime (gitignored)
+│   └── sample_stereo_pairs/        <- generated at runtime (gitignored)
 │       ├── left.png
 │       ├── right.png
-│       └── calib.json
+│       ├── calib.json
+│       └── stereo_calib.json
 │
-├── output/                         ← generated at runtime (gitignored)
+├── output/                         <- generated at runtime (gitignored)
 │   ├── disparity_maps/
 │   │   ├── disparity.png
 │   │   └── depth_colormap.png

@@ -79,12 +79,14 @@ def rectify_pair(
     h, w = left_img.shape[:2]
     image_size = (w, h)
 
-    K_L = np.asarray(stereo_calib["K_left"],  dtype=np.float64)
-    K_R = np.asarray(stereo_calib["K_right"], dtype=np.float64)
-    D_L = np.asarray(stereo_calib["D_left"],  dtype=np.float64)
-    D_R = np.asarray(stereo_calib["D_right"], dtype=np.float64)
-    R   = np.asarray(stereo_calib["R"],        dtype=np.float64)
-    T   = np.asarray(stereo_calib["T"],        dtype=np.float64)
+    K_L = np.asarray(stereo_calib["K_left"],  dtype=np.float64).reshape(3, 3)
+    K_R = np.asarray(stereo_calib["K_right"], dtype=np.float64).reshape(3, 3)
+    # D must be shape (1, 5) — OpenCV is strict about this
+    D_L = np.asarray(stereo_calib["D_left"],  dtype=np.float64).reshape(1, -1)
+    D_R = np.asarray(stereo_calib["D_right"], dtype=np.float64).reshape(1, -1)
+    R   = np.asarray(stereo_calib["R"],        dtype=np.float64).reshape(3, 3)
+    # T must be shape (3, 1) — a column vector
+    T   = np.asarray(stereo_calib["T"],        dtype=np.float64).reshape(3, 1)
 
     # Compute rectification transforms:
     #   R1, R2 : rotation matrices that bring each camera into the rectified frame

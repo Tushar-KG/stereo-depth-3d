@@ -432,3 +432,45 @@ class TestEndToEnd:
         rl, rr = rectify_pair(left, right, stereo_calib=None)
         assert rl.shape == left.shape
         assert rr.shape == right.shape
+
+    def test_stereo_calib_json_generated(self, sample_dir):
+        """generate_sample_pair must also write a stereo_calib.json with full K/D/R/T."""
+        sc_path = sample_dir / "stereo_calib.json"
+        assert sc_path.exists(), "stereo_calib.json was not created"
+
+        import json
+        with sc_path.open() as fh:
+            sc = json.load(fh)
+
+        for key in ("K_left", "K_right", "D_left", "D_right", "R", "T"):
+            assert key in sc, f"stereo_calib.json missing key '{key}'"
+
+        # K must be 3x3, D must have 5 elements, R must be 3x3, T must have 3 elements
+        assert len(sc["K_left"])    == 3 and len(sc["K_left"][0]) == 3
+        assert len(sc["D_left"])    == 5
+        assert len(sc["R"])         == 3 and len(sc["R"][0])      == 3
+        assert len(sc["T"])         == 3
+
+    def test_rectification_full_path_runs(self, sample_dir, sample_images):
+        """rectify_pair with a full stereo_calib dict (from stereo_calib.json) must run
+        the complete cv2.stereoRectify + cv2.remap path without error and produce
+        output images of the same spatial dimensions as the input.
+
+        For our perfectly-aligned synthetic rig (R=I, D=0) the rectification is
+        essentially a no-op warp, so the output images should be non-black and
+        match the input shape.
+        """
+        import json
+        with (sample_dir / "stereo_calib.json").open() as fh:
+            sc = json.load(fh)
+
+        left, right = sample_images
+        rl, rr = rectify_pair(left, right, stereo_calib=sc)
+
+        # Shape must be preserved
+        assert rl.shape == left.shape, "Rectified left shape changed"
+        assert rr.shape == right.shape, "Rectified right shape changed"
+
+        # Images must not be entirely black (rectification warp should preserve content)
+        assert rl.max() > 0, "Rectified left image is entirely black"
+        assert rr.max() > 0, "Rectified right image is entirely black"

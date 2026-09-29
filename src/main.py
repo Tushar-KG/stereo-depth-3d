@@ -149,11 +149,12 @@ def run_pipeline(args: argparse.Namespace) -> None:
     _banner("Step 1 / 6 - Loading images")
 
     if args.generate_sample:
-        print("[info] Generating synthetic stereo pair …")
+        print("[info] Generating synthetic stereo pair ...")
         calib = generate_sample_pair(str(sample_dir))
-        left_path  = str(sample_dir / "left.png")
-        right_path = str(sample_dir / "right.png")
-        calib_path = str(sample_dir / "calib.json")
+        left_path        = str(sample_dir / "left.png")
+        right_path       = str(sample_dir / "right.png")
+        calib_path       = str(sample_dir / "calib.json")
+        stereo_calib_path = str(sample_dir / "stereo_calib.json")
     else:
         if not args.left or not args.right:
             print(
@@ -161,9 +162,10 @@ def run_pipeline(args: argparse.Namespace) -> None:
                 file=sys.stderr,
             )
             sys.exit(1)
-        left_path  = args.left
-        right_path = args.right
-        calib_path = args.calib
+        left_path         = args.left
+        right_path        = args.right
+        calib_path        = args.calib
+        stereo_calib_path = None   # provide via --stereo-calib for full rectification
 
     left_img  = _load_image(left_path,  "left")
     right_img = _load_image(right_path, "right")
@@ -196,8 +198,21 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # Step 3 - Rectification
     # ------------------------------------------------------------------
     _banner("Step 3 / 6 - Rectification")
-    rect_left, rect_right = rectify_pair(left_img, right_img, stereo_calib=None)
-    print("  No full stereo calibration provided -> assuming pre-rectified images (no-op).")
+
+    stereo_calib_dict = None
+    if stereo_calib_path and Path(stereo_calib_path).exists():
+        import json
+        with open(stereo_calib_path) as fh:
+            stereo_calib_dict = json.load(fh)
+        print(f"  Loaded stereo calibration: {stereo_calib_path}")
+        print("  Running full cv2.stereoRectify + cv2.remap ...")
+    else:
+        print("  No stereo_calib.json found -> assuming pre-rectified images (no-op).")
+
+    rect_left, rect_right = rectify_pair(left_img, right_img, stereo_calib=stereo_calib_dict)
+
+    if stereo_calib_dict is not None:
+        print("  Rectification complete (epipolar rows aligned).")
 
     # ------------------------------------------------------------------
     # Step 4 - Disparity

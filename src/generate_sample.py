@@ -26,12 +26,28 @@ same cost, making the optimal disparity ambiguous.  We therefore fill each
 rectangle with speckled random noise -- this provides the local contrast
 needed for reliable matching.
 
-Output
-------
-Writes to a chosen directory:
-  left.png   -- left-eye view
-  right.png  -- right-eye view (rectangles shifted left by the parallax amount)
-  calib.json -- known-correct calibration for the synthetic rig
+Full stereo calibration (stereo_calib.json)
+-------------------------------------------
+Because we know the exact parameters of the synthetic rig, we construct
+a complete stereo calibration in the same format that rectify_pair() expects:
+
+  K_left / K_right : 3x3 intrinsic matrices (identical -- symmetric rig)
+  D_left / D_right : distortion coefficients (all zero -- perfect synthetic lens)
+  R                : 3x3 rotation of right camera relative to left (identity --
+                     both cameras point in the same direction)
+  T                : 3x1 translation of right camera relative to left
+                     ([-baseline_m, 0, 0] -- right camera is B metres to the right)
+
+This file is passed to rectify_pair() to exercise the full
+cv2.stereoRectify + cv2.initUndistortRectifyMap + cv2.remap pipeline,
+making the rectification stage demonstrable end-to-end without real hardware.
+
+Output files
+------------
+  left.png          -- left-eye view
+  right.png         -- right-eye view (rectangles shifted left by the parallax amount)
+  calib.json        -- simple intrinsics (focal_length_px, baseline_m, cx, cy)
+  stereo_calib.json -- full stereo calibration dict for rectify_pair()
 """
 
 import json
@@ -146,7 +162,7 @@ def generate_sample_pair(
     cv2.imwrite(str(output_dir / "left.png"),  left_img)
     cv2.imwrite(str(output_dir / "right.png"), right_img)
 
-    # Write calibration JSON
+    # Write simple intrinsics calibration JSON
     calib = {
         "focal_length_px": focal_length_px,
         "baseline_m":      baseline_m,
@@ -156,6 +172,48 @@ def generate_sample_pair(
     with (output_dir / "calib.json").open("w") as fh:
         json.dump(calib, fh, indent=2)
 
+    # ------------------------------------------------------------------
+    # Write full stereo calibration JSON for rectify_pair()
+    #
+    # The synthetic rig is a perfectly aligned horizontal stereo camera:
+    #   - Both cameras have the same intrinsics (symmetric rig)
+    #   - No lens distortion (synthetic / ideal lenses)
+    #   - Cameras look in exactly the same direction -> R = I (identity)
+    #   - Right camera is displaced B metres to the right of left camera
+    #     -> T = [-B, 0, 0]  (OpenCV convention: T points from left to right
+    #        optical centre expressed in LEFT camera coordinates)
+    #
+    # Passing this to rectify_pair() makes cv2.stereoRectify recognise that
+    # the cameras are already in a canonical horizontal configuration and
+    # produces rectification maps that are nearly identity warps -- verifying
+    # that the full code path (stereoRectify -> initUndistortRectifyMap ->
+    # remap) executes without error and leaves the images visually unchanged.
+    # ------------------------------------------------------------------
+    f = focal_length_px
+    K = [
+        [f,   0.0, cx],
+        [0.0, f,   cy],
+        [0.0, 0.0, 1.0],
+    ]
+    D = [0.0, 0.0, 0.0, 0.0, 0.0]   # zero distortion (ideal synthetic lens)
+    R = [                             # identity rotation (cameras co-planar)
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ]
+    T = [-baseline_m, 0.0, 0.0]      # right camera is B metres to the right
+
+    stereo_calib = {
+        "K_left":  K,
+        "K_right": K,
+        "D_left":  D,
+        "D_right": D,
+        "R":       R,
+        "T":       T,
+    }
+    with (output_dir / "stereo_calib.json").open("w") as fh:
+        json.dump(stereo_calib, fh, indent=2)
+
     print(f"[generate_sample] Written to: {output_dir}")
     print(f"  focal_length_px = {focal_length_px}")
     print(f"  baseline_m      = {baseline_m}")
@@ -163,6 +221,7 @@ def generate_sample_pair(
     for depth_m, _, xf, yf, wf, hf in _SCENE_RECTS:
         disp = (focal_length_px * baseline_m) / depth_m
         print(f"  depth {depth_m:4.1f} m -> expected disparity ~ {disp:.1f} px")
+    print(f"  stereo_calib.json written (K, D, R, T for rectify_pair)")
 
     return calib
 
